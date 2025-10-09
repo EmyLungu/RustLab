@@ -1,3 +1,4 @@
+
 fn add_chars_n(mut s: String, ch: char, n: u32) -> String {
     for _ in 0..n {
         s.push(ch);
@@ -40,7 +41,6 @@ fn p2() {
     print!("{}\n\n", s);
 }
 
-
 fn add_space(str: &mut String, n: u32) {
     for _ in 0..n {
         str.push(' ');
@@ -55,8 +55,13 @@ fn add_integer(str: &mut String, mut value: i32) {
     let mut num_str = String::from("");
     let mut cnt = 0;
 
+    let is_negative: bool = value < 0;
+    if value < 0 {
+        value *= -1;
+    }
+
     while value > 0 {
-        if cnt % 3 == 0 && cnt > 0{
+        if cnt % 3 == 0 && cnt > 0 {
             num_str.push('_');
         }
         num_str.push_str(&(value % 10).to_string());
@@ -64,13 +69,52 @@ fn add_integer(str: &mut String, mut value: i32) {
         cnt += 1;
     }
 
+    if is_negative {
+        num_str.push('-');
+    }
+
     for ch in num_str.chars().rev() {
         str.push(ch);
     }
 }
 
-fn add_float(s: &mut String, value: f32) {
-    s.push_str(&value.to_string());
+fn add_float(str: &mut String, mut value: f32) {
+    let is_negative: bool = value < 0.0;
+    if value < 0.0 {
+        value *= -1.0;
+    }
+
+    let epsilon: f32 = 0.001; 
+    let mut dot = 0;
+    
+    while value.fract().abs() > epsilon {
+        value *= 10.0;
+        dot += 1;
+    }
+
+    let mut num_str = String::from("");
+    let mut value = value.round() as i32; 
+    let mut cnt = 0;
+
+    while value > 0 {
+        if cnt == dot {
+            num_str.push('.');
+        }
+        num_str.push_str(&(value % 10).to_string());
+        value /= 10;
+        cnt += 1;
+    }
+
+    if is_negative {
+        num_str.push('-');
+    }
+
+    let mut result_str = String::from("");
+    for ch in num_str.chars().rev() {
+        result_str.push(ch);
+    }
+    
+    str.push_str(&result_str);
 }
 
 fn p3() {
