@@ -1,4 +1,3 @@
-
 fn add_chars_n(mut s: String, ch: char, n: u32) -> String {
     for _ in 0..n {
         s.push(ch);
@@ -84,16 +83,16 @@ fn add_float(str: &mut String, mut value: f32) {
         value *= -1.0;
     }
 
-    let epsilon: f32 = 0.001; 
+    let epsilon: f32 = 0.001;
     let mut dot = 0;
-    
+
     while value.fract() > epsilon {
         value *= 10.0;
         dot += 1;
     }
 
     let mut num_str = String::from("");
-    let mut value = value.round() as i32; 
+    let mut value = value.round() as i32;
     let mut cnt = 0;
 
     while value > 0 {
@@ -113,7 +112,7 @@ fn add_float(str: &mut String, mut value: f32) {
     for ch in num_str.chars().rev() {
         result_str.push(ch);
     }
-    
+
     str.push_str(&result_str);
 }
 
