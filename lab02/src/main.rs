@@ -87,7 +87,7 @@ fn add_float(str: &mut String, mut value: f32) {
     let epsilon: f32 = 0.001; 
     let mut dot = 0;
     
-    while value.fract().abs() > epsilon {
+    while value.fract() > epsilon {
         value *= 10.0;
         dot += 1;
     }
