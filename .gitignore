@@ -2,6 +2,7 @@
 *.lock
 */target
 
+.vscode
 debug/
 target/
 *.pdb
