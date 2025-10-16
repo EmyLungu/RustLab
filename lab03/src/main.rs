@@ -72,7 +72,7 @@ fn calculate(a: u32, b: u32, c: u32) -> Result<u32, Errors> {
 }
 
 enum CharError {
-    // ASCII,
+    Ascii,
     Digit,
     Base16Digit,
     Letter,
@@ -80,14 +80,14 @@ enum CharError {
 }
 
 fn to_uppercase(c: char) -> Result<char, CharError> {
-    if c.is_ascii_lowercase() {
+    if !c.is_ascii_lowercase() {
         Err(CharError::Letter)
     } else {
         Ok((c as u8 - 32) as char)
     }
 }
 fn to_lowercase(c: char) -> Result<char, CharError> {
-    if c.is_ascii_uppercase() {
+    if !c.is_ascii_uppercase() {
         Err(CharError::Letter)
     } else {
         Ok((c as u8 + 32) as char)
@@ -102,7 +102,9 @@ fn print_char(c: char) -> Result<(), CharError> {
     }
 }
 fn char_to_number(c: char) -> Result<u32, CharError> {
-    if !c.is_ascii() || !c.is_numeric() {
+    if !c.is_ascii() {
+        Err(CharError::Ascii)
+    } else if !c.is_numeric() {
         Err(CharError::Digit)
     } else {
         Ok(c.to_digit(10).unwrap())
@@ -117,7 +119,7 @@ fn char_to_number_hex(c: char) -> Result<u32, CharError> {
 }
 fn print_error(err: CharError) {
     match err {
-        // CharError::ASCII        => println!("The character is not an ASCII character!"),
+        CharError::Ascii => println!("The character is not an ASCII character!"),
         CharError::Digit => println!("The character is not a digit!"),
         CharError::Base16Digit => println!("The character is not a digit in base 16!"),
         CharError::Letter => println!("The character is not a letter!"),
@@ -137,10 +139,10 @@ fn main() {
     }
 
     println!("{}\n", add(13, 17));
-    println!("{}\n", add(u32::MAX, 1));
+    // println!("{}\n", add(u32::MAX, 1));
 
     println!("{}\n", multiply(6, 7));
-    println!("{}\n", multiply(u32::MAX, 2));
+    // println!("{}\n", multiply(u32::MAX, 2));
 
     match calculate(2, 5, 9) {
         Ok(ans) => {
@@ -176,19 +178,19 @@ fn main() {
         Err(e) => print_error(e),
     }
     match char_to_number('3') {
-        Ok(new_c) => println!("3 => {}", new_c),
+        Ok(num) => println!("3 => {}", num),
         Err(e) => print_error(e),
     }
     match char_to_number('T') {
-        Ok(new_c) => println!("T => {}\n", new_c),
+        Ok(num) => println!("T => {}\n", num),
         Err(e) => print_error(e),
     }
     match char_to_number_hex('E') {
-        Ok(new_c) => println!("E => {}", new_c),
+        Ok(num) => println!("E => {}", num),
         Err(e) => print_error(e),
     }
     match char_to_number_hex('T') {
-        Ok(new_c) => println!("T => {}\n", new_c),
+        Ok(num) => println!("T => {}\n", num),
         Err(e) => print_error(e),
     }
 }
