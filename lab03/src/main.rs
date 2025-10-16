@@ -80,17 +80,17 @@ enum CharError {
 }
 
 fn to_uppercase(c: char) -> Result<char, CharError> {
-    if !c.is_alphabetic() {
+    if c.is_ascii_lowercase() {
         Err(CharError::Letter)
     } else {
-        Ok(c.to_ascii_uppercase())
+        Ok((c as u8 - 32) as char)
     }
 }
 fn to_lowercase(c: char) -> Result<char, CharError> {
-    if !c.is_alphabetic() {
+    if c.is_ascii_uppercase() {
         Err(CharError::Letter)
     } else {
-        Ok(c.to_ascii_lowercase())
+        Ok((c as u8 + 32) as char)
     }
 }
 fn print_char(c: char) -> Result<(), CharError> {
@@ -130,10 +130,10 @@ fn main() {
     println!("{}\n", next_prime(65_534).unwrap_or(0));
 
     println!("{}\n", add(13, 17));
-    // println!("{}\n", add(u32::MAX, 1));
+    println!("{}\n", add(u32::MAX, 1));
 
     println!("{}\n", multiply(6, 7));
-    // println!("{}\n", multiply(u32::MAX, 2));
+    println!("{}\n", multiply(u32::MAX, 2));
 
     match calculate(2, 5, 9) {
         Ok(ans) => {
