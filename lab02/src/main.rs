@@ -3,7 +3,7 @@ fn add_chars_n(mut s: String, ch: char, n: u32) -> String {
         s.push(ch);
     }
 
-    return s;
+    s
 }
 
 fn add_chars_n_ref(s: &mut String, ch: char, n: u32) {
@@ -17,7 +17,7 @@ fn p1() {
 
     let mut i = 0;
     while i < 26 {
-        let c = (i as u8 + 'a' as u8) as char;
+        let c = (i as u8 + b'a') as char;
         s = add_chars_n(s, c, 26 - i);
 
         i += 1;
@@ -31,7 +31,7 @@ fn p2() {
 
     let mut i = 0;
     while i < 26 {
-        let c = (i as u8 + 'a' as u8) as char;
+        let c = (i as u8 + b'a') as char;
         add_chars_n_ref(&mut s, c, 26 - i);
 
         i += 1;
