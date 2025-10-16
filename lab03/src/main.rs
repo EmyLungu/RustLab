@@ -3,9 +3,9 @@ fn prime(x: u16) -> bool {
         return false;
     }
 
-    let mut d = 3;
-    while d * d <= x {
-        if x.is_multiple_of(d) {
+    let mut d: u32 = 3;
+    while d * d <= x as u32 {
+        if x.is_multiple_of(d as u16) {
             return false;
         }
 
@@ -127,7 +127,14 @@ fn print_error(err: CharError) {
 
 fn main() {
     println!("{}", next_prime(7).unwrap());
-    println!("{}\n", next_prime(65_534).unwrap_or(0));
+
+    let mut num: u16 = 7;
+    while next_prime(num).is_some() {
+        num += 1;
+    }
+    if next_prime(num).is_none() {
+        println!("{} nu mai are un next_prime in u16\n", num);
+    }
 
     println!("{}\n", add(13, 17));
     println!("{}\n", add(u32::MAX, 1));
