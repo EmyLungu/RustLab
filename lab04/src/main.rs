@@ -3,9 +3,9 @@ use std::{fs, io};
 fn p1(filepath: &str) -> Result<(), io::Error> {
     let s = fs::read_to_string(filepath)?;
 
-    let mut line = String::from("");
-    let mut longest_bytes = String::from("");
-    let mut longest_chars = String::from("");
+    let mut line = String::new();
+    let mut longest_bytes = String::new();
+    let mut longest_chars = String::new();
 
     for c in s.chars() {
         line.push(c);
@@ -30,9 +30,9 @@ fn p1(filepath: &str) -> Result<(), io::Error> {
 }
 
 fn p2(s: &str) -> Result<String, io::Error> {
-    let mut new_s: String = String::from("");
+    let mut new_s: String = String::new();
     for ch in s.chars() {
-        if !ch.is_ascii() {
+        if !ch.is_ascii_alphabetic() {
             return Err(io::Error::other("Error: Un caracter nu este ASCII!\n"));
         }
 
@@ -46,31 +46,16 @@ fn p2(s: &str) -> Result<String, io::Error> {
 
 fn p3(input_filepath: &str, output_filepath: &str) -> Result<(), io::Error> {
     let text = fs::read_to_string(input_filepath)?;
-    let mut s = text.as_str();
-
-    let mut output_s = String::from("");
-    loop {
-        let index = s.find(" ");
-
-        let final_index: usize = index.unwrap_or(s.len());
-
-        let word: &str = &s[..final_index];
-        if word == "pt" || word == "ptr" {
-            output_s.push_str("pentru");
-        } else if word == "dl" {
-            output_s.push_str("domnul");
-        } else if word == "dna" {
-            output_s.push_str("doman");
-        } else {
-            output_s.push_str(word);
+    
+    let mut output_s = String::new();
+    for word in text.split(" ") {
+        match word {
+            "pt" | "ptr" => output_s.push_str("pentru"),
+            "dl" => output_s.push_str("domnul"),
+            "dna" => output_s.push_str("doamna"),
+            _ => output_s.push_str(word),
         }
         output_s.push(' ');
-
-        if index.is_none() {
-            break;
-        }
-
-        s = &s[index.unwrap() + 1..]
     }
 
     fs::write(output_filepath, &output_s)?;
@@ -82,7 +67,7 @@ fn p3(input_filepath: &str, output_filepath: &str) -> Result<(), io::Error> {
 fn p4() -> Result<(), io::Error> {
     let s = fs::read_to_string("/etc/hosts")?;
 
-    let mut line = String::from("");
+    let mut line = String::new();
 
     for c in s.chars() {
         line.push(c);
@@ -124,7 +109,7 @@ fn main() {
         Ok(new_s) => println!("abCdFGHiJklmNOpqrStUVXyZ => {}", new_s),
         Err(e) => println!("{}", e),
     }
-    match p2("Hel🎃o") {
+    match p2("Hel🦀o") {
         Ok(_) => {}
         Err(e) => println!("{}", e),
     }
