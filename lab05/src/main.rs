@@ -155,7 +155,7 @@ fn p3(filepath: &str) -> Result<(), io::Error> {
 fn main() {
     let game: bool = false;
 
-    if game {
+    if !game {
         if let Err(e) = p1("students.txt") {
             println!("Eroare p1: {}", e);
         }
@@ -166,7 +166,7 @@ fn main() {
             println!("Eroare p3: {}", e);
         }
     } else {
-        game_of_life::run();
+        game_of_life::start();
     }
 
 }
