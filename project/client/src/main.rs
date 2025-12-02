@@ -15,6 +15,7 @@ fn get_conf() -> Conf {
 
 #[macroquad::main(get_conf)]
 async fn main() {
+    rand::srand(macroquad::miniquad::date::now() as _);
     let mut app = App::new();
 
     loop {

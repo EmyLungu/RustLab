@@ -5,10 +5,3 @@ edition = "2024"
 
 [dependencies]
 macroquad = "0.4.14"
-# bevy = { version = "0.17.3", features = ["dynamic_linking"] }
-#
-# [profile.dev]
-# opt-level = 1
-#
-# [profile.dev.package."*"]
-# opt-level = 3

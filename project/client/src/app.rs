@@ -1,11 +1,15 @@
-use macroquad::{input::mouse_position, math::Vec2, miniquad::window::screen_size};
+use macroquad::{
+    input::{is_mouse_button_pressed, mouse_position},
+    math::Vec2,
+    miniquad::window::screen_size,
+};
 
 use crate::grid::Grid;
 
 pub struct App {
     grid: Grid,
     window_size: Vec2,
-    mouse_pos: Vec2
+    mouse_pos: Vec2,
 }
 
 impl App {
@@ -13,7 +17,7 @@ impl App {
         Self {
             grid: Grid::new(11, 11),
             window_size: screen_size().into(),
-            mouse_pos: Vec2::new(0.0, 0.0)
+            mouse_pos: Vec2::new(0.0, 0.0),
         }
     }
 
@@ -32,12 +36,15 @@ impl App {
         if self.mouse_pos != current_mouse_pos {
             if let Some((i, j)) = self.grid.get_tile(current_mouse_pos) {
                 self.grid.highlight((i, j));
-                println!("Found {i} {j}");
             } else {
                 self.grid.reset_highlight();
             }
 
             self.mouse_pos = current_mouse_pos;
+        }
+
+        if is_mouse_button_pressed(macroquad::input::MouseButton::Left) && self.grid.place_wall() {
+            self.grid.move_mouse();
         }
     }
 
