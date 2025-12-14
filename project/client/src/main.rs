@@ -1,5 +1,7 @@
 mod app;
 mod grid;
+mod menu;
+mod network;
 
 use crate::app::App;
 use macroquad::prelude::*;
@@ -18,8 +20,9 @@ async fn main() {
     rand::srand(macroquad::miniquad::date::now() as _);
     let mut app = App::new();
 
+    
     loop {
-        clear_background(DARKGRAY);
+        clear_background(Color::from_hex(0x3B4953));
         app.check_resize();
         app.handle_input();
 

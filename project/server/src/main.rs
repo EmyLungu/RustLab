@@ -1,3 +1,10 @@
+mod controller;
+mod room;
+mod grid;
+
+use crate::controller::Controller;
+
 fn main() {
-    println!("Hello, world!");
+    let mut controller = Controller::new();
+    controller.run();
 }
