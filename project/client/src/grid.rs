@@ -1,7 +1,6 @@
-use macroquad::prelude::Vec2;
 use macroquad::{
     color::Color,
-    prelude::rand,
+    prelude::{Vec2, draw_text, measure_text, rand},
     shapes::draw_poly,
     window::{screen_height, screen_width},
 };
@@ -9,11 +8,23 @@ use macroquad::{
 const DEFAULT_HEX_RADIUS: f32 = 32.0;
 const HEX_OUTLINE_THINKNESS: f32 = 6.0;
 
+#[repr(u8)]
 #[derive(Clone, Copy, PartialEq)]
 enum Entity {
     None,
     Mouse,
     Wall,
+}
+
+impl From<u8> for Entity {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Entity::None,
+            1 => Entity::Mouse,
+            2 => Entity::Wall,
+            _ => Entity::None,
+        }
+    }
 }
 
 struct Tile {
@@ -85,6 +96,7 @@ pub struct Grid {
     center: Vec2,
     mouse_pos: (usize, usize),
     highlighted: Option<(usize, usize)>,
+    can_action: bool,
 }
 
 impl Grid {
@@ -96,7 +108,7 @@ impl Grid {
             - Self::get_grid_size(width, height) / 2.0;
 
         let (cx, cy) = (width as f32 / 2.0, height as f32 / 2.0);
-        let mut tiles: Vec<Vec<Tile>> = (0..height)
+        let tiles: Vec<Vec<Tile>> = (0..height)
             .map(|i| {
                 (0..width)
                     .map(|j| {
@@ -117,9 +129,6 @@ impl Grid {
             .collect();
 
         let mouse_pos = (height / 2, width / 2);
-        tiles[mouse_pos.0][mouse_pos.1].set_holder(Entity::Mouse);
-
-        Self::generate_walls(&mut tiles, 5);
 
         Self {
             width,
@@ -128,7 +137,12 @@ impl Grid {
             mouse_pos,
             highlighted: None,
             tiles,
+            can_action: false,
         }
+    }
+
+    pub fn set_action(&mut self, value: bool) {
+        self.can_action = value;
     }
 
     pub fn center(&mut self) {
@@ -144,20 +158,6 @@ impl Grid {
             hex_width * width as f32 - hex_width * 0.5,
             hex_height * (height - 1) as f32,
         )
-    }
-
-    fn generate_walls(tiles: &mut [Vec<Tile>], mut num_walls: u8) {
-        let height = tiles.len();
-        let width = tiles[0].len();
-        while num_walls > 0 {
-            let x = rand::gen_range(0, width);
-            let y = rand::gen_range(0, height);
-
-            if tiles[y][x].is_empty() {
-                tiles[y][x].set_holder(Entity::Wall);
-                num_walls -= 1;
-            }
-        }
     }
 
     pub fn get_tile(&self, mut pos: Vec2) -> Option<(usize, usize)> {
@@ -258,11 +258,20 @@ impl Grid {
         }
     }
 
+    pub fn place_entity(&mut self, y: usize, x: usize, entity: u8) {
+        self.tiles[y][x].set_holder(Entity::from(entity));
+    }
+
     pub fn render(&self) {
         for line in self.tiles.iter() {
             for tile in line {
                 tile.render(self.center);
             }
         }
+
+        let title = "Waiting for players (1/2)";
+        let title_width = measure_text(title, None, 32, 1.0).width;
+        let x = screen_width() * 0.5 - title_width * 0.5;
+        draw_text(title, x, 32.0, 32.0, Color::from_hex(0xEBF4DD));
     }
 }

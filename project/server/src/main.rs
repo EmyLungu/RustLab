@@ -1,6 +1,6 @@
 mod controller;
-mod room;
 mod grid;
+mod room;
 
 use crate::controller::Controller;
 
