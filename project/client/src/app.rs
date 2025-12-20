@@ -1,3 +1,5 @@
+use std::{thread, time};
+
 use crate::{
     grid::Grid,
     menu::Menu,
@@ -10,6 +12,7 @@ use macroquad::{
     math::Vec2,
     miniquad::window::screen_size,
     text::draw_text,
+    window::{clear_background, next_frame, screen_height, screen_width},
 };
 
 pub struct App {
@@ -23,14 +26,18 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        Self {
+        let mut app = Self {
             grid: None,
             menu: Menu::new(),
             network: Network::new(),
             window_size: screen_size().into(),
             mouse_pos: Vec2::new(0.0, 0.0),
             my_turn: false,
-        }
+        };
+
+        app.menu.refresh_rooms(&mut app.network);
+
+        app
     }
 
     pub fn check_resize(&mut self) {
@@ -66,12 +73,12 @@ impl App {
                 && let Some((y, x)) = grid.get_tile(current_mouse_pos)
                 && let Err(e) = self.network.make_turn(y, x)
             {
-                eprintln!("Errror at make turn [{}]", e);
+                eprintln!("Error at make turn [{}]", e);
             }
         }
     }
 
-    pub fn update_state(&mut self) -> Result<(), std::io::Error> {
+    pub async fn update_state(&mut self) -> Result<(), std::io::Error> {
         match self.network.check_for_updates() {
             Ok(Update::YourTurn) => {
                 self.network.request_tiles(&mut self.grid)?;
@@ -82,12 +89,26 @@ impl App {
                 self.my_turn = false;
             }
             Ok(Update::GameOver) => {
+                clear_background(Color::from_hex(0x3B4953));
+                self.render();
+
+                draw_text(
+                    "GAME OVER!",
+                    screen_width() / 3.5,
+                    screen_height() / 2.0,
+                    86.0,
+                    Color::from_hex(0xF54927),
+                );
+
+                next_frame().await;
+
+                thread::sleep(time::Duration::from_secs(5));
+
                 self.menu.refresh_rooms(&mut self.network);
                 self.menu.visible = true;
                 self.network.room_id = None;
                 self.grid = None;
                 self.my_turn = false;
-                println!("Finished game over!");
             }
             Ok(Update::None) => {}
             Err(_) => {}
@@ -114,6 +135,11 @@ impl App {
                 36.0,
                 Color::new(1.0 - col_value, col_value, 0.1, 1.0),
             );
+        } else {
+            let title = "Waiting for players (1/2)";
+            let title_width = macroquad::text::measure_text(title, None, 32, 1.0).width;
+            let x = macroquad::window::screen_width() * 0.5 - title_width * 0.5;
+            draw_text(title, x, 32.0, 32.0, Color::from_hex(0xEBF4DD));
         }
     }
 }

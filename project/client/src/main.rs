@@ -23,7 +23,7 @@ async fn main() {
     loop {
         clear_background(Color::from_hex(0x3B4953));
         app.check_resize();
-        if let Err(e) = app.update_state() {
+        if let Err(e) = app.update_state().await {
             eprintln!("Error [{}]", e);
         }
         app.handle_input();

@@ -1,4 +1,5 @@
 use crate::room::TurnResult;
+use rand::random_range;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq)]
@@ -69,43 +70,6 @@ impl Grid {
         }
     }
 
-    // pub fn get_tile(&self, mut _pos: Vec2) -> Option<(usize, usize)> {
-    // pos -= self.center;
-    //
-    // let hex_width = DEFAULT_HEX_RADIUS * 3.0_f32.sqrt();
-    // let hex_height = DEFAULT_HEX_RADIUS * 1.5;
-    //
-    // let j = (pos.y / hex_height).round() as i32;
-    // if j < 0 || j as usize >= self.height {
-    //     return None;
-    // }
-    //
-    // let offset = if j % 2 == 1 { hex_width * 0.5 } else { 0.0 };
-    // let i = ((pos.x - offset) / hex_width).round() as i32;
-    // if i < 0 || i as usize >= self.width {
-    //     return None;
-    // }
-    //
-    // let i = i as usize;
-    // let j = j as usize;
-    //
-    // let pos = pos - self.tiles[i][j].get_pos();
-    // if pos.x.abs() > hex_width / 2.0 {
-    //     return None;
-    // }
-    //
-    // if pos.y.abs() > DEFAULT_HEX_RADIUS {
-    //     return None;
-    // }
-    //
-    // if pos.y.abs() * (hex_width / 2.0 / DEFAULT_HEX_RADIUS) + pos.x.abs() > hex_width / 2.0 {
-    //     return None;
-    // }
-    //
-    // Some((i, j))
-    //     None
-    // }
-
     pub fn place(&mut self, y: &usize, x: &usize, entity: Entity) -> TurnResult {
         if self.tiles[*y][*x] == Entity::None {
             self.tiles[*y][*x] = entity;
@@ -115,39 +79,45 @@ impl Grid {
         }
     }
 
-    // pub fn move_mouse_random(&mut self) {
-    //     let (mi, mj) = self.mouse_pos;
-    //     let neighbours: Vec<(i32, i32)> = if mj % 2 == 0 {
-    //         vec![(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1)]
-    //     } else {
-    //         vec![(-1, 0), (1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]
-    //     };
-    //     let mut valid = Vec::<(usize, usize)>::new();
-    //
-    //     for (di, dj) in neighbours.iter() {
-    //         let i = mi as i32 + di;
-    //         let j = mj as i32 + dj;
-    //
-    //         if i >= 0
-    //             && i < self.height as i32
-    //             && j >= 0
-    //             && j < self.width as i32
-    //             && self.tiles[i as usize][j as usize] == Entity::None
-    //         {
-    //             valid.push((i as usize, j as usize));
-    //         }
-    //     }
-    //
-    //     if !valid.is_empty() {
-    //         // let idx = rand::gen_range(0, valid.len());
-    //         // let (i, j) = valid[idx];
-    //         // self.tiles[mi][mj].set_holder(Entity::None);
-    //         // self.tiles[i][j].set_holder(Entity::Mouse);
-    //         // self.mouse_pos = (i, j);
-    //     } else {
-    //         todo!("Soarecele a pierdut!");
-    //     }
-    // }
+    pub fn move_mouse_random(&mut self) -> TurnResult {
+        let (mi, mj) = self.mouse_pos;
+        let neighbours: Vec<(i32, i32)> = if mj % 2 == 0 {
+            vec![(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1)]
+        } else {
+            vec![(-1, 0), (1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]
+        };
+        let mut valid = Vec::<(usize, usize)>::new();
+
+        for (di, dj) in neighbours.iter() {
+            let i = mi as i32 + di;
+            let j = mj as i32 + dj;
+
+            if i >= 0
+                && i < self.height as i32
+                && j >= 0
+                && j < self.width as i32
+                && self.tiles[i as usize][j as usize] == Entity::None
+            {
+                valid.push((i as usize, j as usize));
+            }
+        }
+
+        if !valid.is_empty() {
+            let idx = random_range(0..valid.len());
+            let (i, j) = valid[idx];
+            self.tiles[mi][mj] = Entity::None;
+            self.tiles[i][j] = Entity::Mouse;
+            self.mouse_pos = (i, j);
+
+            if i == 0 || i == self.height - 1 || j == 0 || j == self.width - 1 {
+                TurnResult::GameOver
+            } else {
+                TurnResult::Good
+            }
+        } else {
+            TurnResult::GameOver
+        }
+    }
 
     pub fn move_mouse(&mut self, y: &usize, x: &usize) -> TurnResult {
         let (mi, mj) = self.mouse_pos;

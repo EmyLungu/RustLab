@@ -1,6 +1,6 @@
 use macroquad::{
     color::Color,
-    prelude::{Vec2, draw_text, measure_text, rand},
+    prelude::Vec2,
     shapes::draw_poly,
     window::{screen_height, screen_width},
 };
@@ -15,7 +15,6 @@ enum Entity {
     Mouse,
     Wall,
 }
-
 impl From<u8> for Entity {
     fn from(value: u8) -> Self {
         match value {
@@ -44,9 +43,6 @@ impl Tile {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.holder == Entity::None
-    }
     fn set_holder(&mut self, entity: Entity) {
         self.holder = entity;
     }
@@ -94,9 +90,7 @@ pub struct Grid {
     height: usize,
     tiles: Vec<Vec<Tile>>,
     center: Vec2,
-    mouse_pos: (usize, usize),
     highlighted: Option<(usize, usize)>,
-    can_action: bool,
 }
 
 impl Grid {
@@ -128,21 +122,13 @@ impl Grid {
             })
             .collect();
 
-        let mouse_pos = (height / 2, width / 2);
-
         Self {
             width,
             height,
             center,
-            mouse_pos,
             highlighted: None,
             tiles,
-            can_action: false,
         }
-    }
-
-    pub fn set_action(&mut self, value: bool) {
-        self.can_action = value;
     }
 
     pub fn center(&mut self) {
@@ -211,53 +197,6 @@ impl Grid {
         }
     }
 
-    pub fn place_wall(&mut self) -> bool {
-        if let Some((i, j)) = self.highlighted
-            && self.tiles[i][j].is_empty()
-        {
-            self.tiles[i][j].set_holder(Entity::Wall);
-            println!("Cliecked {i} {j}");
-
-            return true;
-        }
-
-        false
-    }
-
-    pub fn move_mouse(&mut self) {
-        let (mi, mj) = self.mouse_pos;
-        let neighbours: Vec<(i32, i32)> = if mj % 2 == 0 {
-            vec![(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1)]
-        } else {
-            vec![(-1, 0), (1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]
-        };
-        let mut valid = Vec::<(usize, usize)>::new();
-
-        for (di, dj) in neighbours.iter() {
-            let i = mi as i32 + di;
-            let j = mj as i32 + dj;
-
-            if i >= 0
-                && i < self.height as i32
-                && j >= 0
-                && j < self.width as i32
-                && self.tiles[i as usize][j as usize].is_empty()
-            {
-                valid.push((i as usize, j as usize));
-            }
-        }
-
-        if !valid.is_empty() {
-            let idx = rand::gen_range(0, valid.len());
-            let (i, j) = valid[idx];
-            self.tiles[i][j].set_holder(Entity::Mouse);
-            self.tiles[mi][mj].set_holder(Entity::None);
-            self.mouse_pos = (i, j);
-        } else {
-            todo!("Soarecele a pierdut!");
-        }
-    }
-
     pub fn place_entity(&mut self, y: usize, x: usize, entity: u8) {
         self.tiles[y][x].set_holder(Entity::from(entity));
     }
@@ -268,10 +207,5 @@ impl Grid {
                 tile.render(self.center);
             }
         }
-
-        let title = "Waiting for players (1/2)";
-        let title_width = measure_text(title, None, 32, 1.0).width;
-        let x = screen_width() * 0.5 - title_width * 0.5;
-        draw_text(title, x, 32.0, 32.0, Color::from_hex(0xEBF4DD));
     }
 }

@@ -7,7 +7,7 @@ use std::{
 #[repr(u8)]
 pub enum Protocol {
     RequestRooms,
-    StartRoom,
+    StartRoomBot,
     JoinRoom,
     JoinSuccess,
     RequestTiles,
@@ -67,6 +67,24 @@ impl Network {
         Ok(room_data)
     }
 
+    pub fn start_room_bot(&mut self, username: String) -> Result<(), std::io::Error> {
+        self.stream.write_all(&[Protocol::StartRoomBot as u8])?;
+        self.stream
+            .write_all(&(username.len() as u32).to_le_bytes())?;
+        self.stream.write_all(&username.into_bytes())?;
+
+        let mut responseb = [0u8; 1];
+        self.stream.read_exact(&mut responseb)?;
+
+        if responseb[0] == Protocol::JoinSuccess as u8 {
+            let mut room_idb = [0u8; 16];
+            self.stream.read_exact(&mut room_idb)?;
+
+            self.room_id = Some(room_idb);
+        }
+
+        Ok(())
+    }
     pub fn join_room(&mut self, room_id: &RoomId, username: String) -> Result<(), std::io::Error> {
         self.stream.write_all(&[Protocol::JoinRoom as u8])?;
         self.stream.write_all(room_id)?;
@@ -114,6 +132,7 @@ impl Network {
 
                 new_grid.place_entity(y, x, entity);
             }
+
             *grid = Some(new_grid);
         }
         Ok(())

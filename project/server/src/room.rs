@@ -1,6 +1,7 @@
 use crate::grid::{Entity, Grid};
 use uuid::Uuid;
 
+#[derive(PartialEq)]
 pub enum TurnResult {
     Good,
     Bad,
@@ -9,7 +10,7 @@ pub enum TurnResult {
 
 pub struct Room {
     pub players: Vec<Uuid>,
-    max_players: u8,
+    pub max_players: u8,
     grid: Grid,
 }
 
@@ -50,21 +51,15 @@ impl Room {
         }
     }
 
-    pub fn is_user_in(&self, uid: &Uuid) -> bool {
-        for user in &self.players {
-            if *user == *uid {
-                return true;
-            }
-        }
-
-        false
-    }
-
     pub fn process_turn(&mut self, uid: &Uuid, y: &usize, x: &usize) -> TurnResult {
         if self.players[0] == *uid {
             self.grid.place(y, x, Entity::Wall)
         } else {
             self.grid.move_mouse(y, x)
         }
+    }
+
+    pub fn move_mouse_random(&mut self) -> TurnResult {
+        self.grid.move_mouse_random()
     }
 }
