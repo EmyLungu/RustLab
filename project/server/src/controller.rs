@@ -1,4 +1,4 @@
-use crate::room::{Room, TurnResult};
+use crate::room::{PlayerType, Room, TurnResult};
 use std::collections::HashMap;
 use std::{
     io::{Read, Write},
@@ -14,6 +14,7 @@ enum Protocol {
     JoinRoom,
     JoinSuccess,
     RequestTiles,
+    StartGame,
     Turn,
     WaitTurn,
     YourTurn,
@@ -22,8 +23,6 @@ enum Protocol {
 
 #[derive(thiserror::Error, Debug)]
 enum ServerErr {
-    // #[error("User disconnected")]
-    // UserDisconnected,
     #[error("Unknown Command")]
     UnknownCommand,
 
@@ -167,6 +166,14 @@ impl Controller {
         uid: &Uuid,
         state: &Arc<Mutex<ServerState>>,
     ) -> Result<(), ServerErr> {
+        let mut typeb = [0u8; 1];
+        stream.read_exact(&mut typeb)?;
+        let player_type = if typeb[0] == 0 {
+            PlayerType::Mouse
+        } else {
+            PlayerType::Wall
+        };
+
         let mut lenb = [0u8; 4];
         stream.read_exact(&mut lenb)?;
         let len = u32::from_le_bytes(lenb) as usize;
@@ -179,15 +186,27 @@ impl Controller {
         Self::set_name(uid, &username, state);
 
         if let Some(room_id) = Self::add_room(1, state) {
-            Self::add_user_to_room(uid, &room_id, state);
+            Self::add_user_to_room(uid, &room_id, &player_type, state);
 
             let successb: [u8; 1] = [Protocol::JoinSuccess as u8];
             stream.write_all(&successb)?;
             stream.write_all(&room_id.to_bytes_le())?;
 
-            Self::check_start_room(&room_id, state)?;
+            // Self::check_start_room(&room_id, state)?;
 
             println!("User [{}] started new bot game in [{}]", username, room_id);
+
+            stream.write_all(&[Protocol::StartGame as u8])?;
+            let opp_name = "BOT";
+            stream.write_all(&(opp_name.len() as u32).to_le_bytes())?;
+            stream.write_all(opp_name.as_bytes())?;
+
+            if player_type == PlayerType::Mouse
+                && let Ok(mut state_guard) = state.lock()
+                && let Some(room) = state_guard.rooms.get_mut(&room_id)
+            {
+                room.ai_turn();
+            }
 
             stream.write_all(&[Protocol::YourTurn as u8])?;
         }
@@ -203,6 +222,14 @@ impl Controller {
         stream.read_exact(&mut room_idb)?;
         let room_id = Uuid::from_bytes_le(room_idb);
 
+        let mut typeb = [0u8; 1];
+        stream.read_exact(&mut typeb)?;
+        let player_type = if typeb[0] == 0 {
+            PlayerType::Mouse
+        } else {
+            PlayerType::Wall
+        };
+
         let mut lenb = [0u8; 4];
         stream.read_exact(&mut lenb)?;
         let len = u32::from_le_bytes(lenb) as usize;
@@ -214,7 +241,7 @@ impl Controller {
         println!("User [{}] wants to join [{}]", username, room_id);
 
         Self::set_name(uid, &username, state);
-        Self::add_user_to_room(uid, &room_id, state);
+        Self::add_user_to_room(uid, &room_id, &player_type, state);
 
         let successb: [u8; 1] = [Protocol::JoinSuccess as u8];
         stream.write_all(&successb)?;
@@ -229,7 +256,13 @@ impl Controller {
             && let Some(room) = state_guard.rooms.get(room_id)
             && room.get_player_count() == 2
         {
-            Some((room.players[0], room.players[1]))
+            let (p1, ptype1) = room.players[0];
+            let (p2, _) = room.players[1];
+            if ptype1 == PlayerType::Wall {
+                Some((p1, p2))
+            } else {
+                Some((p2, p1))
+            }
         } else {
             None
         };
@@ -237,10 +270,25 @@ impl Controller {
         if let Ok(mut state_guard) = state.lock()
             && let Some((pid1, pid2)) = player_ids
         {
+            let p1_name = if let Some(p1) = state_guard.users.get(&pid1) {
+                p1.username.clone()
+            } else { String::from("Guest") };
+            let p2_name = if let Some(p2) = state_guard.users.get(&pid2) {
+                p2.username.clone()
+            } else { String::from("Guest") };
+
             if let Some(player1) = state_guard.users.get_mut(&pid1) {
+                player1.stream.write_all(&[Protocol::StartGame as u8])?;
+                player1.stream.write_all(&(p2_name.len() as u32).to_le_bytes())?;
+                player1.stream.write_all(p2_name.as_bytes())?;
+
                 player1.stream.write_all(&[Protocol::YourTurn as u8])?;
             }
             if let Some(player2) = state_guard.users.get_mut(&pid2) {
+                player2.stream.write_all(&[Protocol::StartGame as u8])?;
+                player2.stream.write_all(&(p1_name.len() as u32).to_le_bytes())?;
+                player2.stream.write_all(p1_name.as_bytes())?;
+
                 player2.stream.write_all(&[Protocol::WaitTurn as u8])?;
             }
         }
@@ -336,44 +384,6 @@ impl Controller {
                 }
             }
         }
-        // if let Ok(mut state_guard) = state.lock() {
-        //     let room_id = match state_guard.find_user_room(uid) {
-        //         Some(id) => id,
-        //         None => {
-        //             stream.write_all(&[Protocol::WaitTurn as u8])?;
-        //             return Ok(());
-        //         }
-        //     };
-        //
-        //     if let Some(room) = state_guard.rooms.get_mut(&room_id) {
-        //         if room.max_players == 1 {
-        //         } else {
-        //             match room.process_turn(uid, &y, &x) {
-        //                 TurnResult::Good => {
-        //                     stream.write_all(&[Protocol::WaitTurn as u8])?;
-        //
-        //                     if let Some(other_player_id) = room.get_other_player(uid)
-        //                     && let Some(other_player) = state_guard.users.get_mut(&other_player_id)
-        //                     {
-        //                         other_player.stream.write_all(&[Protocol::YourTurn as u8])?;
-        //                     }
-        //                 }
-        //                 TurnResult::Bad => {}
-        //                 TurnResult::GameOver => {
-        //                     stream.write_all(&[Protocol::GameOver as u8])?;
-        //
-        //                     if let Some(other_player_id) = room.get_other_player(uid)
-        //                     && let Some(other_player) = state_guard.users.get_mut(&other_player_id)
-        //                     {
-        //                         other_player.stream.write_all(&[Protocol::GameOver as u8])?;
-        //                     }
-        //
-        //                     state_guard.rooms.remove(&room_id);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
 
         Ok(())
     }
@@ -391,8 +401,12 @@ impl Controller {
         {
             match room.process_turn(uid, y, x) {
                 TurnResult::Good => {
-                    if room.move_mouse_random() == TurnResult::GameOver {
+                    if room.ai_turn() == TurnResult::GameOver {
                         stream.write_all(&[Protocol::GameOver as u8])?;
+                        
+                        let data = room.get_grid();
+                        stream.write_all(&data)?;
+
                         state_guard.rooms.remove(room_id);
                     } else {
                         stream.write_all(&[Protocol::YourTurn as u8])?;
@@ -401,6 +415,9 @@ impl Controller {
                 TurnResult::Bad => {}
                 TurnResult::GameOver => {
                     stream.write_all(&[Protocol::GameOver as u8])?;
+                    let data = room.get_grid();
+                    stream.write_all(&data)?;
+
                     state_guard.rooms.remove(room_id);
                 }
             }
@@ -417,15 +434,25 @@ impl Controller {
         room_id: &Uuid,
         state: &Arc<Mutex<ServerState>>,
     ) -> Result<(), ServerErr> {
-        if let Ok(mut state_guard) = state.lock()
+        let data: Option<(TurnResult, Option<Uuid>, Vec<u8>)> =
+            if let Ok(mut state_guard) = state.lock()
             && let Some(room) = state_guard.rooms.get_mut(room_id)
         {
-            match room.process_turn(uid, y, x) {
+            Some((
+                room.process_turn(uid, y, x),
+                room.get_other_player(uid),
+                room.get_grid()
+            ))
+        } else { None };
+
+        if let Some((turn_result, other_player_id, grid_data)) = data {
+            match turn_result {
                 TurnResult::Good => {
                     stream.write_all(&[Protocol::WaitTurn as u8])?;
 
-                    if let Some(other_player_id) = room.get_other_player(uid)
-                        && let Some(other_player) = state_guard.users.get_mut(&other_player_id)
+                    if let Some(pid) = other_player_id
+                        && let Ok(mut state_guard) = state.lock()
+                        && let Some(other_player) = state_guard.users.get_mut(&pid)
                     {
                         other_player.stream.write_all(&[Protocol::YourTurn as u8])?;
                     }
@@ -433,18 +460,21 @@ impl Controller {
                 TurnResult::Bad => {}
                 TurnResult::GameOver => {
                     stream.write_all(&[Protocol::GameOver as u8])?;
+                    stream.write_all(&grid_data)?;
 
-                    if let Some(other_player_id) = room.get_other_player(uid)
-                        && let Some(other_player) = state_guard.users.get_mut(&other_player_id)
+                    if let Some(pid) = other_player_id
+                        && let Ok(mut state_guard) = state.lock()
+                        && let Some(other_player) = state_guard.users.get_mut(&pid)
                     {
                         other_player.stream.write_all(&[Protocol::GameOver as u8])?;
-                    }
+                        other_player.stream.write_all(&grid_data)?;
+                        println!("Game over for the other player!");
 
-                    state_guard.rooms.remove(room_id);
+                        state_guard.rooms.remove(room_id);
+                    }
                 }
             }
         }
-
         Ok(())
     }
 
@@ -467,11 +497,16 @@ impl Controller {
         }
     }
 
-    fn add_user_to_room(user_id: &Uuid, room_id: &Uuid, state: &Arc<Mutex<ServerState>>) {
+    fn add_user_to_room(
+        user_id: &Uuid,
+        room_id: &Uuid,
+        player_type: &PlayerType,
+        state: &Arc<Mutex<ServerState>>
+    ) {
         if let Ok(mut state_guard) = state.lock()
             && let Some(room) = state_guard.rooms.get_mut(room_id)
         {
-            room.add_player(user_id);
+            room.add_player(user_id, player_type);
             if let Some(user) = state_guard.users.get_mut(user_id) {
                 user.room = Some(*room_id);
             }

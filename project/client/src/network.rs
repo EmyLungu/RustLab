@@ -1,4 +1,5 @@
 use crate::grid::Grid;
+use crate::menu::PlayerType;
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -11,6 +12,7 @@ pub enum Protocol {
     JoinRoom,
     JoinSuccess,
     RequestTiles,
+    StartGame,
     Turn,
     WaitTurn,
     YourTurn,
@@ -19,6 +21,7 @@ pub enum Protocol {
 
 pub enum Update {
     None,
+    StartGame,
     YourTurn,
     WaitTurn,
     GameOver,
@@ -30,6 +33,7 @@ type RoomData = Vec<(RoomId, u8)>;
 pub struct Network {
     stream: TcpStream,
     pub room_id: Option<RoomId>,
+    pub opponent_username: String,
 }
 
 impl Network {
@@ -39,6 +43,7 @@ impl Network {
         Self {
             stream,
             room_id: None,
+            opponent_username: String::new(),
         }
     }
 
@@ -60,18 +65,20 @@ impl Network {
 
             let player_count = u8::from_le_bytes(player_countb);
             room_data.push((room_idb, player_count));
-
-            println!("Room found with {} players", player_count);
         }
 
         Ok(room_data)
     }
 
-    pub fn start_room_bot(&mut self, username: String) -> Result<(), std::io::Error> {
+    pub fn start_room_bot(&mut self, player_type: &PlayerType, username: &str) -> Result<(), std::io::Error> {
+        if username.chars().count() == 0 {
+            return Err(std::io::Error::other("Invalid username"));
+        }
+
         self.stream.write_all(&[Protocol::StartRoomBot as u8])?;
-        self.stream
-            .write_all(&(username.len() as u32).to_le_bytes())?;
-        self.stream.write_all(&username.into_bytes())?;
+        self.stream.write_all(&[*player_type as u8])?;
+        self.stream.write_all(&(username.len() as u32).to_le_bytes())?;
+        self.stream.write_all(username.as_bytes())?;
 
         let mut responseb = [0u8; 1];
         self.stream.read_exact(&mut responseb)?;
@@ -85,12 +92,17 @@ impl Network {
 
         Ok(())
     }
-    pub fn join_room(&mut self, room_id: &RoomId, username: String) -> Result<(), std::io::Error> {
+
+    pub fn join_room(&mut self, room_id: &RoomId, player_type: &PlayerType, username: &str) -> Result<(), std::io::Error> {
+        if username.chars().count() == 0 {
+            return Err(std::io::Error::other("Invalid username"));
+        }
+
         self.stream.write_all(&[Protocol::JoinRoom as u8])?;
         self.stream.write_all(room_id)?;
-        self.stream
-            .write_all(&(username.len() as u32).to_le_bytes())?;
-        self.stream.write_all(&username.into_bytes())?;
+        self.stream.write_all(&[*player_type as u8])?;
+        self.stream.write_all(&(username.len() as u32).to_le_bytes())?;
+        self.stream.write_all(username.as_bytes())?;
 
         let mut responseb = [0u8; 1];
         self.stream.read_exact(&mut responseb)?;
@@ -102,39 +114,45 @@ impl Network {
         Ok(())
     }
 
-    pub fn request_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), std::io::Error> {
+    pub async fn request_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), std::io::Error> {
         if let Some(room_id) = self.room_id {
             self.stream.write_all(&[Protocol::RequestTiles as u8])?;
             self.stream.write_all(&room_id)?;
 
-            let mut sizeb = [0u8; 4];
-            self.stream.read_exact(&mut sizeb)?;
-            let width = u32::from_le_bytes(sizeb) as usize;
-
-            self.stream.read_exact(&mut sizeb)?;
-            let height = u32::from_le_bytes(sizeb) as usize;
-
-            self.stream.read_exact(&mut sizeb)?;
-            let tile_count = u32::from_le_bytes(sizeb) as usize;
-
-            let mut new_grid = Grid::new(width, height);
-            let mut byte = [0u8; 1];
-
-            for _ in 0..tile_count {
-                self.stream.read_exact(&mut byte)?;
-                let y = byte[0] as usize;
-
-                self.stream.read_exact(&mut byte)?;
-                let x = byte[0] as usize;
-
-                self.stream.read_exact(&mut byte)?;
-                let entity = byte[0];
-
-                new_grid.place_entity(y, x, entity);
-            }
-
-            *grid = Some(new_grid);
+            self.read_tiles(grid).await?;
         }
+        Ok(())
+    }
+
+    pub async fn read_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), std::io::Error> {
+        let mut sizeb = [0u8; 4];
+        self.stream.read_exact(&mut sizeb)?;
+        let width = u32::from_le_bytes(sizeb) as usize;
+
+        self.stream.read_exact(&mut sizeb)?;
+        let height = u32::from_le_bytes(sizeb) as usize;
+
+        self.stream.read_exact(&mut sizeb)?;
+        let tile_count = u32::from_le_bytes(sizeb) as usize;
+
+        let mut new_grid = Grid::new(width, height);
+        let mut byte = [0u8; 1];
+
+        for _ in 0..tile_count {
+            self.stream.read_exact(&mut byte)?;
+            let y = byte[0] as usize;
+
+            self.stream.read_exact(&mut byte)?;
+            let x = byte[0] as usize;
+
+            self.stream.read_exact(&mut byte)?;
+            let entity = byte[0];
+
+            new_grid.place_entity(y, x, entity);
+        }
+
+        new_grid.load_textures().await;
+        *grid = Some(new_grid);
         Ok(())
     }
 
@@ -142,6 +160,18 @@ impl Network {
         self.stream.write_all(&[Protocol::Turn as u8])?;
         self.stream.write_all(&(y as u32).to_le_bytes())?;
         self.stream.write_all(&(x as u32).to_le_bytes())?;
+
+        Ok(())
+    }
+
+    pub fn get_opponent_username(&mut self) -> Result<(), std::io::Error> {
+        let mut lenb = [0u8; 4];
+        self.stream.read_exact(&mut lenb)?;
+        let len = u32::from_le_bytes(lenb) as usize;
+
+        let mut usernameb = vec![0u8; len];
+        self.stream.read_exact(&mut usernameb)?;
+        self.opponent_username = String::from_utf8_lossy(&usernameb).to_string();
 
         Ok(())
     }
@@ -157,6 +187,7 @@ impl Network {
                 self.stream.read_exact(&mut update_typeb)?;
 
                 match update_typeb[0] {
+                    x if x == Protocol::StartGame as u8 => Ok(Update::StartGame),
                     x if x == Protocol::YourTurn as u8 => Ok(Update::YourTurn),
                     x if x == Protocol::WaitTurn as u8 => Ok(Update::WaitTurn),
                     x if x == Protocol::GameOver as u8 => Ok(Update::GameOver),

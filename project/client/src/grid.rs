@@ -1,7 +1,8 @@
 use macroquad::{
     color::Color,
     prelude::Vec2,
-    shapes::draw_poly,
+    shapes::{draw_poly},
+    texture::{Texture2D, DrawTextureParams, draw_texture_ex, load_texture},
     window::{screen_height, screen_width},
 };
 
@@ -55,7 +56,7 @@ impl Tile {
         self.highlight = value;
     }
 
-    fn render(&self, offset: Vec2) {
+    fn render(&self, offset: Vec2, mouse_tex: &Option<Texture2D>) {
         let pos = self.pos + offset;
         let darker = Color::new(
             self.color.r - 0.1,
@@ -78,8 +79,20 @@ impl Tile {
         );
 
         match self.holder {
-            Entity::Mouse => draw_poly(pos.x, pos.y, 36, 16.0, 0.0, Color::new(1.0, 0.1, 0.1, 1.0)),
-            Entity::Wall => draw_poly(pos.x, pos.y, 36, 16.0, 0.0, Color::new(0.1, 0.1, 1.0, 1.0)),
+            Entity::Mouse => {
+                if let Some(tex) = mouse_tex {
+                    draw_texture_ex(
+                        tex,
+                        pos.x - 32.0, pos.y - 32.0,
+                        Color::from_hex(0xFFFFFF),
+                        DrawTextureParams {
+                            dest_size: Some(Vec2::new(64.0, 64.0)),
+                            ..Default::default()
+                        },
+);
+                }
+            }
+            Entity::Wall => draw_poly(pos.x, pos.y, 6, 24.0, 90.0, Color::from_hex(0x964B00)),
             Entity::None => {}
         }
     }
@@ -91,6 +104,7 @@ pub struct Grid {
     tiles: Vec<Vec<Tile>>,
     center: Vec2,
     highlighted: Option<(usize, usize)>,
+    mouse_tex: Option<Texture2D>,
 }
 
 impl Grid {
@@ -128,7 +142,12 @@ impl Grid {
             center,
             highlighted: None,
             tiles,
+            mouse_tex: None,
         }
+    }
+
+    pub async fn load_textures(&mut self) {
+        self.mouse_tex = load_texture("assets/mouse.png").await.ok();
     }
 
     pub fn center(&mut self) {
@@ -204,7 +223,7 @@ impl Grid {
     pub fn render(&self) {
         for line in self.tiles.iter() {
             for tile in line {
-                tile.render(self.center);
+                tile.render(self.center, &self.mouse_tex);
             }
         }
     }

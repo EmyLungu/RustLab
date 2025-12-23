@@ -1,6 +1,7 @@
 mod app;
 mod grid;
 mod menu;
+mod button;
 mod network;
 
 use crate::app::App;
@@ -19,6 +20,7 @@ fn get_conf() -> Conf {
 async fn main() {
     rand::srand(macroquad::miniquad::date::now() as _);
     let mut app = App::new();
+    app.menu.load_textures().await;
 
     loop {
         clear_background(Color::from_hex(0x3B4953));

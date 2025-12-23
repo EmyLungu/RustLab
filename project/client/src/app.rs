@@ -15,9 +15,12 @@ use macroquad::{
     window::{clear_background, next_frame, screen_height, screen_width},
 };
 
+const MIN_WIDTH: f32 = 64.0;
+const MIN_HEIGHT: f32 = 64.0;
+
 pub struct App {
+    pub menu: Menu,
     grid: Option<Grid>,
-    menu: Menu,
     network: Network,
     window_size: Vec2,
     mouse_pos: Vec2,
@@ -42,6 +45,17 @@ impl App {
 
     pub fn check_resize(&mut self) {
         let current_size: Vec2 = screen_size().into();
+
+        let (width, height) = (screen_width(), screen_height());
+        if width < MIN_WIDTH {
+            let new_width = width.max(MIN_WIDTH);
+            macroquad::prelude::request_new_screen_size(new_width, height);
+        }
+
+        if height < MIN_HEIGHT {
+            let new_height = height.max(MIN_HEIGHT);
+            macroquad::prelude::request_new_screen_size(width, new_height);
+        }
 
         if self.window_size.x != current_size.x || self.window_size.y != current_size.y {
             if let Some(grid) = &mut self.grid {
@@ -80,15 +94,20 @@ impl App {
 
     pub async fn update_state(&mut self) -> Result<(), std::io::Error> {
         match self.network.check_for_updates() {
+            Ok(Update::StartGame) => {
+                self.network.get_opponent_username()?;
+            }
             Ok(Update::YourTurn) => {
-                self.network.request_tiles(&mut self.grid)?;
+                self.network.request_tiles(&mut self.grid).await?;
                 self.my_turn = true;
             }
             Ok(Update::WaitTurn) => {
-                self.network.request_tiles(&mut self.grid)?;
+                self.network.request_tiles(&mut self.grid).await?;
                 self.my_turn = false;
             }
             Ok(Update::GameOver) => {
+                self.network.read_tiles(&mut self.grid).await?;
+
                 clear_background(Color::from_hex(0x3B4953));
                 self.render();
 
@@ -130,12 +149,20 @@ impl App {
             let col_value = if self.my_turn { 0.9 } else { 0.1 };
             draw_text(
                 text,
+                screen_width() * 0.20,
                 32.0,
-                64.0,
                 36.0,
                 Color::new(1.0 - col_value, col_value, 0.1, 1.0),
             );
-        } else {
+
+            draw_text(
+                &format!("{} vs {}", self.menu.username, &self.network.opponent_username),
+                screen_width() * 0.6,
+                32.0,
+                36.0,
+                Color::from_hex(0xEBF4DD),
+            );
+        } else if self.network.room_id.is_some() {
             let title = "Waiting for players (1/2)";
             let title_width = macroquad::text::measure_text(title, None, 32, 1.0).width;
             let x = macroquad::window::screen_width() * 0.5 - title_width * 0.5;

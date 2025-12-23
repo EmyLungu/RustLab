@@ -8,8 +8,14 @@ pub enum TurnResult {
     GameOver,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum PlayerType {
+    Mouse,
+    Wall,
+}
+
 pub struct Room {
-    pub players: Vec<Uuid>,
+    pub players: Vec<(Uuid, PlayerType)>,
     pub max_players: u8,
     grid: Grid,
 }
@@ -27,8 +33,14 @@ impl Room {
         self.get_player_count() < self.max_players
     }
 
-    pub fn add_player(&mut self, uid: &Uuid) {
-        self.players.push(*uid);
+    pub fn add_player(&mut self, uid: &Uuid, player_type: &PlayerType) {
+        self.players.push((*uid, *player_type));
+    }
+
+    fn get_player_type(&self, uid: &Uuid) -> Option<PlayerType> {
+        self.players.iter()
+            .find(|(id, _)| *id == *uid)
+            .map(|(_, ptype)| *ptype)
     }
 
     pub fn get_player_count(&self) -> u8 {
@@ -41,10 +53,10 @@ impl Room {
 
     pub fn get_other_player(&self, uid: &Uuid) -> Option<Uuid> {
         if self.get_player_count() == 2 {
-            if self.players[0] == *uid {
-                Some(self.players[1])
+            if self.players[0].0 == *uid {
+                Some(self.players[1].0)
             } else {
-                Some(self.players[0])
+                Some(self.players[0].0)
             }
         } else {
             None
@@ -52,14 +64,20 @@ impl Room {
     }
 
     pub fn process_turn(&mut self, uid: &Uuid, y: &usize, x: &usize) -> TurnResult {
-        if self.players[0] == *uid {
-            self.grid.place(y, x, Entity::Wall)
+        if let Some(player_type) = self.get_player_type(uid) {
+            match player_type {
+                PlayerType::Mouse => self.grid.move_mouse(y, x),
+                PlayerType::Wall => self.grid.place(y, x, Entity::Wall),
+            }
         } else {
-            self.grid.move_mouse(y, x)
+            TurnResult::Bad
         }
     }
 
-    pub fn move_mouse_random(&mut self) -> TurnResult {
-        self.grid.move_mouse_random()
+    pub fn ai_turn(&mut self) -> TurnResult {
+        match self.players[0].1 {
+            PlayerType::Mouse => self.grid.place_random(Entity::Wall),
+            PlayerType::Wall => self.grid.move_mouse_random(),
+        }
     }
 }
