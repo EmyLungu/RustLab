@@ -1,9 +1,9 @@
 use macroquad::{
-    prelude::Vec2,
     color::Color,
-    window::{screen_width},
-    text::{draw_text, measure_text},
+    prelude::Vec2,
     shapes::draw_rectangle,
+    text::{draw_text, measure_text},
+    window::screen_width,
 };
 
 #[derive(Clone, Copy, PartialEq)]
@@ -33,7 +33,7 @@ impl Button {
         size: Vec2,
         text: String,
         color: Color,
-        responsive: bool
+        responsive: bool,
     ) -> Self {
         Self {
             button_type,
@@ -42,14 +42,16 @@ impl Button {
             text,
             color,
             responsive,
-            highlighted: false
+            highlighted: false,
         }
     }
 
     pub fn is_inside(&self, p: Vec2) -> bool {
         let offset = if self.responsive {
-            Vec2::new(screen_width(), 0.0) }
-        else { Vec2::new(0.0, 0.0) };
+            Vec2::new(screen_width(), 0.0)
+        } else {
+            Vec2::new(0.0, 0.0)
+        };
 
         let pos = self.pos + offset;
 
@@ -58,13 +60,17 @@ impl Button {
 
     pub fn render(&self) {
         let offset = if self.responsive {
-            Vec2::new(screen_width(), 0.0) }
-        else { Vec2::new(0.0, 0.0) };
+            Vec2::new(screen_width(), 0.0)
+        } else {
+            Vec2::new(0.0, 0.0)
+        };
 
         let pos = self.pos + offset;
         draw_rectangle(
-            pos.x, pos.y,
-            self.size.x, self.size.y,
+            pos.x,
+            pos.y,
+            self.size.x,
+            self.size.y,
             if self.highlighted {
                 Color::new(
                     self.color.r * 0.9,
@@ -84,7 +90,7 @@ impl Button {
             center.x - (dim.width * 0.5),
             center.y + (dim.offset_y * 0.5),
             32.0,
-            Color::from_hex(0xEBF4DD)
+            Color::from_hex(0xEBF4DD),
         );
     }
 }

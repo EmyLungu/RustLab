@@ -18,6 +18,18 @@ use macroquad::{
 const MIN_WIDTH: f32 = 64.0;
 const MIN_HEIGHT: f32 = 64.0;
 
+#[derive(thiserror::Error, Debug)]
+pub enum ClientErr {
+    #[error("Invalid username!")]
+    InvalidUsername,
+
+    #[error("Join failed!")]
+    JoinFail,
+
+    #[error("Io error: {0}")]
+    IO(#[from] std::io::Error),
+}
+
 pub struct App {
     pub menu: Menu,
     grid: Option<Grid>,
@@ -28,11 +40,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, ClientErr> {
         let mut app = Self {
             grid: None,
             menu: Menu::new(),
-            network: Network::new(),
+            network: Network::new()?,
             window_size: screen_size().into(),
             mouse_pos: Vec2::new(0.0, 0.0),
             my_turn: false,
@@ -40,7 +52,7 @@ impl App {
 
         app.menu.refresh_rooms(&mut app.network);
 
-        app
+        Ok(app)
     }
 
     pub fn check_resize(&mut self) {
@@ -92,7 +104,7 @@ impl App {
         }
     }
 
-    pub async fn update_state(&mut self) -> Result<(), std::io::Error> {
+    pub async fn update_state(&mut self) -> Result<(), ClientErr> {
         match self.network.check_for_updates() {
             Ok(Update::StartGame) => {
                 self.network.get_opponent_username()?;
@@ -136,7 +148,7 @@ impl App {
         Ok(())
     }
 
-    pub fn render(&self) {
+    pub fn render(&mut self) {
         self.menu.render();
         if let Some(grid) = &self.grid {
             grid.render();
@@ -156,7 +168,10 @@ impl App {
             );
 
             draw_text(
-                &format!("{} vs {}", self.menu.username, &self.network.opponent_username),
+                &format!(
+                    "{} vs {}",
+                    self.menu.username, &self.network.opponent_username
+                ),
                 screen_width() * 0.6,
                 32.0,
                 36.0,

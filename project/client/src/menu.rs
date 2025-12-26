@@ -1,11 +1,19 @@
 use macroquad::{
-    color::Color, input::{
-        KeyCode, MouseButton, get_char_pressed, is_key_down, is_key_pressed, is_mouse_button_pressed, mouse_position
-    }, prelude::Vec2, shapes::{draw_poly, draw_rectangle}, text::{draw_text, measure_text}, texture::{Texture2D, draw_texture, load_texture}, window::{screen_height, screen_width}
+    color::Color,
+    input::{
+        KeyCode, MouseButton, get_char_pressed, is_key_down, is_key_pressed,
+        is_mouse_button_pressed, mouse_position,
+    },
+    prelude::Vec2,
+    shapes::{draw_poly, draw_rectangle},
+    text::{draw_text, measure_text},
+    texture::{Texture2D, draw_texture, load_texture},
+    window::{screen_height, screen_width},
 };
 
-use crate::network::Network;
 use crate::button::{Button, ButtonType};
+use crate::network::Network;
+use crate::notification::NotificaitonsManager;
 
 const MENU_OFFSET: f32 = 64.0;
 const START_ROOMS_Y: f32 = 286.0;
@@ -33,6 +41,7 @@ pub struct Menu {
     rooms: Vec<Room>,
     buttons: [Button; 5],
     mouse_tex: Option<Texture2D>,
+    notifications: NotificaitonsManager,
 }
 
 impl Menu {
@@ -88,6 +97,7 @@ impl Menu {
             rooms: Vec::new(),
             buttons,
             mouse_tex: None,
+            notifications: NotificaitonsManager::new(),
         }
     }
 
@@ -105,16 +115,21 @@ impl Menu {
                         room_id: *room_id,
                         button: Button::new(
                             ButtonType::Room,
-                            Vec2::new(-8.0 * MENU_OFFSET, START_ROOMS_Y + (ROOM_HEIGHT + 8.0) * idx as f32),
+                            Vec2::new(
+                                -8.0 * MENU_OFFSET,
+                                START_ROOMS_Y + (ROOM_HEIGHT + 8.0) * idx as f32,
+                            ),
                             Vec2::new(400.0, ROOM_HEIGHT),
                             format!("\t\t\tRoom {}\t({}/2) players", idx + 1, player_count),
                             Color::from_hex(0x5A7863),
-                            true
-                        )
+                            true,
+                        ),
                     });
                 }
             }
-            Err(e) => eprintln!("Could not request rooms ({})", e),
+            Err(e) => self
+                .notifications
+                .add(format!("Could not request rooms ({})", e), false),
         }
     }
 
@@ -141,7 +156,6 @@ impl Menu {
         }
 
         if is_mouse_button_pressed(MouseButton::Left) {
-
             let mut clicked: Option<ButtonType> = None;
             let mut room_id: Option<[u8; 16]> = None;
             for button in &self.buttons {
@@ -184,7 +198,8 @@ impl Menu {
 
         if is_key_pressed(KeyCode::Enter) {
             self.writing_mode = false;
-            if let Some(b) = &mut self.buttons
+            if let Some(b) = &mut self
+                .buttons
                 .iter_mut()
                 .find(|b| b.button_type == ButtonType::EnterText)
             {
@@ -192,8 +207,9 @@ impl Menu {
             }
         }
 
-        if update &&
-            let Some(b) = &mut self.buttons
+        if update
+            && let Some(b) = &mut self
+                .buttons
                 .iter_mut()
                 .find(|b| b.button_type == ButtonType::EnterText)
         {
@@ -205,16 +221,18 @@ impl Menu {
         &mut self,
         button_type: ButtonType,
         room_id: Option<[u8; 16]>,
-        network: &mut Network)
-    {
+        network: &mut Network,
+    ) {
         match button_type {
             ButtonType::Refresh => self.refresh_rooms(network),
             ButtonType::StartGameBot => {
                 match network.start_room_bot(&self.player_type, &self.username) {
                     Ok(()) => self.visible = false,
-                    Err(e) => eprintln!("Could not start new bot room ({})", e),
+                    Err(e) => self
+                        .notifications
+                        .add(format!("Could not start new bot room ({})", e), false),
                 }
-            },
+            }
             ButtonType::EnterText => self.writing_mode = true,
             ButtonType::LeftSelect => self.swap_player_type(),
             ButtonType::RightSelect => self.swap_player_type(),
@@ -222,7 +240,9 @@ impl Menu {
                 if let Some(rid) = room_id {
                     match network.join_room(&rid, &self.player_type, &self.username) {
                         Ok(()) => self.visible = false,
-                        Err(e) => eprintln!("Could not send join room request ({})", e),
+                        Err(e) => self
+                            .notifications
+                            .add(format!("Could not join room ({})", e), false),
                     }
                 }
             }
@@ -236,7 +256,7 @@ impl Menu {
         }
     }
 
-    pub fn render(&self) {
+    pub fn render(&mut self) {
         if !self.visible {
             return;
         }
@@ -272,24 +292,37 @@ impl Menu {
             let text = match self.player_type {
                 PlayerType::Mouse => {
                     draw_texture(
-                        tex, MENU_OFFSET + 64.0, START_ROOMS_Y + 64.0,
-                        Color::from_hex(0xFFFFFF)
+                        tex,
+                        MENU_OFFSET + 64.0,
+                        START_ROOMS_Y + 64.0,
+                        Color::from_hex(0xFFFFFF),
                     );
 
                     "Mouse"
                 }
                 PlayerType::Wall => {
+                    let color = Color::from_hex(0x964B00);
+                    let darker = Color::new(color.r - 0.1, color.g - 0.1, color.b - 0.1, 1.0);
                     draw_poly(
                         MENU_OFFSET + 104.0,
                         START_ROOMS_Y + 86.0,
-                        6, 48.0, 90.0,
-                        Color::from_hex(0x964B00)
+                        6,
+                        48.0,
+                        90.0,
+                        darker,
+                    );
+                    draw_poly(
+                        MENU_OFFSET + 104.0,
+                        START_ROOMS_Y + 86.0,
+                        6,
+                        24.0,
+                        90.0,
+                        color,
                     );
 
                     "Wall"
-                },
+                }
             };
-
 
             draw_text(
                 &("Play as: ".to_owned() + text),
@@ -323,5 +356,7 @@ impl Menu {
         for room in self.rooms.iter() {
             room.button.render();
         }
+
+        self.notifications.render();
     }
 }

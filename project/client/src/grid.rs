@@ -1,8 +1,8 @@
 use macroquad::{
     color::Color,
     prelude::Vec2,
-    shapes::{draw_poly},
-    texture::{Texture2D, DrawTextureParams, draw_texture_ex, load_texture},
+    shapes::draw_poly,
+    texture::{DrawTextureParams, Texture2D, draw_texture_ex, load_texture},
     window::{screen_height, screen_width},
 };
 
@@ -83,16 +83,22 @@ impl Tile {
                 if let Some(tex) = mouse_tex {
                     draw_texture_ex(
                         tex,
-                        pos.x - 32.0, pos.y - 32.0,
+                        pos.x - 32.0,
+                        pos.y - 32.0,
                         Color::from_hex(0xFFFFFF),
                         DrawTextureParams {
                             dest_size: Some(Vec2::new(64.0, 64.0)),
                             ..Default::default()
                         },
-);
+                    );
                 }
             }
-            Entity::Wall => draw_poly(pos.x, pos.y, 6, 24.0, 90.0, Color::from_hex(0x964B00)),
+            Entity::Wall => {
+                let color = Color::from_hex(0x964B00);
+                let darker = Color::new(color.r - 0.1, color.g - 0.1, color.b - 0.1, 1.0);
+                draw_poly(pos.x, pos.y, 6, 24.0, 90.0, darker);
+                draw_poly(pos.x, pos.y, 6, 12.0, 90.0, color);
+            }
             Entity::None => {}
         }
     }

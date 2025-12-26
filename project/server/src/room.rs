@@ -38,7 +38,8 @@ impl Room {
     }
 
     fn get_player_type(&self, uid: &Uuid) -> Option<PlayerType> {
-        self.players.iter()
+        self.players
+            .iter()
             .find(|(id, _)| *id == *uid)
             .map(|(_, ptype)| *ptype)
     }

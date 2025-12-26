@@ -39,7 +39,6 @@ impl Grid {
         let mut bytes: Vec<u8> = Vec::new();
         let mut tiles: Vec<u8> = Vec::new();
 
-
         bytes.extend((self.width as u32).to_le_bytes());
         bytes.extend((self.height as u32).to_le_bytes());
 
@@ -103,7 +102,6 @@ impl Grid {
 
         if !valid.is_empty() {
             if let Some((i, j)) = valid.iter().find(|(i, j)| i == y && j == x) {
-
                 self.tiles[mi][mj] = Entity::None;
                 self.tiles[*i][*j] = Entity::Mouse;
                 self.mouse_pos = (*i, *j);
@@ -127,10 +125,7 @@ impl Grid {
 
         if !valid.is_empty() {
             let dist_map = self.get_distance_map();
-            let best_move = valid.iter()
-                .min_by_key(|&(i, j)| {
-                    dist_map[*i][*j]
-                });
+            let best_move = valid.iter().min_by_key(|&(i, j)| dist_map[*i][*j]);
 
             if let Some(&(i, j)) = best_move {
                 self.tiles[mi][mj] = Entity::None;
@@ -157,14 +152,16 @@ impl Grid {
             vec![(-1, 0), (1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]
         };
 
-        neighbours.iter()
+        neighbours
+            .iter()
             .map(|(di, dj)| (pi as i32 + di, pj as i32 + dj))
-            .filter(|&(i, j)|
+            .filter(|&(i, j)| {
                 i >= 0
-                && i < self.height as i32
-                && j >= 0
-                && j < self.width as i32
-                && self.tiles[i as usize][j as usize] == Entity::None)
+                    && i < self.height as i32
+                    && j >= 0
+                    && j < self.width as i32
+                    && self.tiles[i as usize][j as usize] == Entity::None
+            })
             .map(|(i, j)| (i as usize, j as usize))
             .collect()
     }

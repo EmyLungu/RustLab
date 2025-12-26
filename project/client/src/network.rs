@@ -1,8 +1,10 @@
+use crate::app::ClientErr;
 use crate::grid::Grid;
 use crate::menu::PlayerType;
 use std::{
     io::{Read, Write},
-    net::TcpStream,
+    net::{TcpStream, ToSocketAddrs},
+    time::Duration,
 };
 
 #[repr(u8)]
@@ -11,6 +13,7 @@ pub enum Protocol {
     StartRoomBot,
     JoinRoom,
     JoinSuccess,
+    JoinFail,
     RequestTiles,
     StartGame,
     Turn,
@@ -37,17 +40,22 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn new() -> Self {
-        let stream = TcpStream::connect("127.0.0.1:1922").expect("Could not connect to server!");
-
-        Self {
-            stream,
-            room_id: None,
-            opponent_username: String::new(),
+    pub fn new() -> Result<Self, ClientErr> {
+        if let Ok(mut addrs) = "127.0.0.1:1922".to_socket_addrs()
+            && let Some(addr) = addrs.next()
+        {
+            let stream = TcpStream::connect_timeout(&addr, Duration::from_secs(5))?;
+            Ok(Self {
+                stream,
+                room_id: None,
+                opponent_username: String::new(),
+            })
+        } else {
+            Err(ClientErr::JoinFail)
         }
     }
 
-    pub fn request_rooms(&mut self) -> Result<RoomData, std::io::Error> {
+    pub fn request_rooms(&mut self) -> Result<RoomData, ClientErr> {
         self.stream.write_all(&[Protocol::RequestRooms as u8])?;
 
         let mut room_countb = [0u8; 4];
@@ -70,14 +78,19 @@ impl Network {
         Ok(room_data)
     }
 
-    pub fn start_room_bot(&mut self, player_type: &PlayerType, username: &str) -> Result<(), std::io::Error> {
+    pub fn start_room_bot(
+        &mut self,
+        player_type: &PlayerType,
+        username: &str,
+    ) -> Result<(), ClientErr> {
         if username.chars().count() == 0 {
-            return Err(std::io::Error::other("Invalid username"));
+            return Err(ClientErr::InvalidUsername);
         }
 
         self.stream.write_all(&[Protocol::StartRoomBot as u8])?;
         self.stream.write_all(&[*player_type as u8])?;
-        self.stream.write_all(&(username.len() as u32).to_le_bytes())?;
+        self.stream
+            .write_all(&(username.len() as u32).to_le_bytes())?;
         self.stream.write_all(username.as_bytes())?;
 
         let mut responseb = [0u8; 1];
@@ -93,15 +106,21 @@ impl Network {
         Ok(())
     }
 
-    pub fn join_room(&mut self, room_id: &RoomId, player_type: &PlayerType, username: &str) -> Result<(), std::io::Error> {
+    pub fn join_room(
+        &mut self,
+        room_id: &RoomId,
+        player_type: &PlayerType,
+        username: &str,
+    ) -> Result<(), ClientErr> {
         if username.chars().count() == 0 {
-            return Err(std::io::Error::other("Invalid username"));
+            return Err(ClientErr::InvalidUsername);
         }
 
         self.stream.write_all(&[Protocol::JoinRoom as u8])?;
         self.stream.write_all(room_id)?;
         self.stream.write_all(&[*player_type as u8])?;
-        self.stream.write_all(&(username.len() as u32).to_le_bytes())?;
+        self.stream
+            .write_all(&(username.len() as u32).to_le_bytes())?;
         self.stream.write_all(username.as_bytes())?;
 
         let mut responseb = [0u8; 1];
@@ -109,12 +128,14 @@ impl Network {
 
         if responseb[0] == Protocol::JoinSuccess as u8 {
             self.room_id = Some(*room_id);
+        } else if responseb[0] == Protocol::JoinFail as u8 {
+            return Err(ClientErr::JoinFail);
         }
 
         Ok(())
     }
 
-    pub async fn request_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), std::io::Error> {
+    pub async fn request_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), ClientErr> {
         if let Some(room_id) = self.room_id {
             self.stream.write_all(&[Protocol::RequestTiles as u8])?;
             self.stream.write_all(&room_id)?;
@@ -124,7 +145,7 @@ impl Network {
         Ok(())
     }
 
-    pub async fn read_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), std::io::Error> {
+    pub async fn read_tiles(&mut self, grid: &mut Option<Grid>) -> Result<(), ClientErr> {
         let mut sizeb = [0u8; 4];
         self.stream.read_exact(&mut sizeb)?;
         let width = u32::from_le_bytes(sizeb) as usize;
@@ -156,7 +177,7 @@ impl Network {
         Ok(())
     }
 
-    pub fn make_turn(&mut self, y: usize, x: usize) -> Result<(), std::io::Error> {
+    pub fn make_turn(&mut self, y: usize, x: usize) -> Result<(), ClientErr> {
         self.stream.write_all(&[Protocol::Turn as u8])?;
         self.stream.write_all(&(y as u32).to_le_bytes())?;
         self.stream.write_all(&(x as u32).to_le_bytes())?;
@@ -164,7 +185,7 @@ impl Network {
         Ok(())
     }
 
-    pub fn get_opponent_username(&mut self) -> Result<(), std::io::Error> {
+    pub fn get_opponent_username(&mut self) -> Result<(), ClientErr> {
         let mut lenb = [0u8; 4];
         self.stream.read_exact(&mut lenb)?;
         let len = u32::from_le_bytes(lenb) as usize;
@@ -176,7 +197,7 @@ impl Network {
         Ok(())
     }
 
-    pub fn check_for_updates(&mut self) -> Result<Update, std::io::Error> {
+    pub fn check_for_updates(&mut self) -> Result<Update, ClientErr> {
         self.stream.set_nonblocking(true)?;
 
         let mut byte = [0u8; 1];
@@ -194,7 +215,7 @@ impl Network {
                     _ => Ok(Update::None),
                 }
             }
-            Err(e) => Err(e),
+            Err(e) => Err(ClientErr::from(e)),
         };
 
         self.stream.set_nonblocking(false)?;
